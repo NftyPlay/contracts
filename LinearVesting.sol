@@ -278,9 +278,6 @@ contract LinearVesting is ReentrancyGuard {
     /// @notice event emitted when a successful drawn down of vesting tokens is made
     event DrawDown(address indexed _beneficiary, uint256 indexed _amount);
 
-    ///event for revoke
-    event TokenVestingRevoked(address token);
-
     /// @notice start of vesting period as a timestamp
     uint256 public start;
 
@@ -305,21 +302,16 @@ contract LinearVesting is ReentrancyGuard {
     /// @notice ERC20 token we are vesting
     IERC20 public token;
 
-    bool private _revocable;
-
-    mapping (address => bool) private _revoked;
-
     /**
      * @notice Construct a new vesting contract
      * @dev caller on constructor set as owner; this can not be changed
      */
     constructor() public {
         owner = msg.sender;
-        token = IERC20(0xb28a7f8f5328faffdd862985177583c2bb71e016); // POLO
+        token = IERC20(0xb28a7f8f5328FafFDd862985177583c2Bb71E016); // POLO
         start = block.timestamp ;        // now
         end = 1704067200;          // 2024-01-01T00:00:00.000Z
         cliffDuration = 86400;   // 24*60*60, emit every day
-        _revocable = true;       //keep owner as multisig to avoid single ownership
     }
 
     /**
@@ -488,20 +480,6 @@ contract LinearVesting is ReentrancyGuard {
         return block.timestamp;
     }
 
-     /**
-     * @return true if the token is revoked.
-     */
-    function revoked(address token) public view returns (bool) {
-        return _revoked[token];
-    }
-
-    /**
-     * @return true if the vesting is revocable.
-     */
-    function revocable() public view returns (bool) {
-        return _revocable;
-    }
-
     function _availableDrawDownAmount(address _beneficiary) internal view returns (uint256 _amount) {
 
         // Cliff Period
@@ -528,29 +506,5 @@ contract LinearVesting is ReentrancyGuard {
         uint256 amount = timePassedSinceLastInvocation.mul(drawDownRate);
 
         return amount;
-    }
-
-    /**
-     * @notice Allows the owner to revoke the vesting. Tokens already vested
-     * remain in the contract, the rest are returned to the owner.
-     * For safety a multi sig should be made owner with no full control of single party
-     * Required to recover the tokens in case something goes wrong
-     */
-    function revoke(address _beneficiary) external {
-        require(msg.sender == owner, "VestingContract::transferOwnership: Only owner");
-        require(_revocable, "VestingContract: cannot revoke");
-        require(_beneficiary != address(0), "VestingContract::revoke: Beneficiary cannot be empty");
-        require(!_revoked[address(token)], "VestingContract: token already revoked");
-
-        uint256 amount = _availableDrawDownAmount(_beneficiary);
-
-        uint256 unreleased = vestedAmount[_beneficiary].sub(totalDrawn[_beneficiary]);
-        uint256 refund = unreleased.sub(amount);
-
-        _revoked[address(token)] = true;
-
-        token.transfer(owner, refund);
-
-        emit TokenVestingRevoked(address(token));
     }
 }
